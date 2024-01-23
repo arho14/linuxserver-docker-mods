@@ -1,0 +1,89 @@
+#!/usr/bin/with-contenv bash
+
+embyPath="/app/emby"  # emby目录
+pathFile=$(find $embyPath -name "Emby.Server.Implementations.dll")
+patchPath="/config/mods/embyAdvancedSearch"  # 补丁目录
+tmpPath="/tmp/embyAdvancedSearch" # 临时目录
+patchVersion="完全版"  # 补丁版本
+
+# 项目相关
+projectUrl="https://github.com/arho14/linuxserver-docker-mods"
+branch="emby-advance-search-src"
+
+getVersion() {
+    # 获取emby版本号
+    # 读取/app/emby/EmbyServer.deps.json内容并存入version变量中
+    if [ -f "/app/emby/system/EmbyServer.deps.json" ]; then
+        version=$(grep -m 1 -oP '(?<=Emby.Web": ")[^"]*' /app/emby/system/EmbyServer.deps.json)
+    elif [-f "/app/emby/EmbyServer.deps.json" ]; then
+        version=$(grep -m 1 -oP '(?<=Emby.Web": ")[^"]*' /app/emby/EmbyServer.deps.json)
+    else
+        echo "**** 安装失败:无法获取emby版本 ****"
+        exit
+    fi
+    echo "**** 当前emby版本为$version ****"
+}
+
+downloadPatch() {
+    echo "**** 正在下载高级搜索补丁 ****"
+    mkdir -p $tmpPath
+    # 到github下载补丁文件
+    if [ -n "$GITHUB_PROXY" ]; then
+        echo "**** 使用代理${GITHUB_PROXY}下载补丁 ****"
+        # git clone -b $branch $GITHUB_PROXY$projectUrl $tmpPath
+        curl -L -o "$tmpPath/$branch.tar.gz" $GITHUB_PROXY$projectUrl/archive/refs/heads/$branch.tar.gz
+        if [ $? -ne 0 ]; then
+            echo "**** 下载失败,请尝试更换代理 ****"
+            exit
+        fi
+    else
+        # git clone -b $branch $projectUrl $tmpPath
+        curl -L -o "$tmpPath/$branch.tar.gz" $projectUrl/archive/refs/heads/$branch.tar.gz
+        if [ $? -ne 0 ]; then
+            echo "**** 补丁下载失败 ****"
+            echo "**** 请设置GITHUB_PROXY环境变量重试(例如：https://gh-proxy.com/) ****"
+            exit
+        fi
+    fi
+    tar -xzf "$tmpPath/$branch.tar.gz" -C "$tmpPath"
+    if [ ! -d "$patchPath" ]; then
+        # 创建补丁目录
+        mkdir -p $patchPath
+        # 设置文件权限
+        lsiown -R abc:abc $patchPath
+    fi
+    # 创建版本目录
+    mkdir $patchPath/$version
+    # 复制对应版本补丁到补丁目录
+    cp -r $(find $tmpPath -type d -name "$version")/system/* $patchPath/$version
+    # 清理临时文件
+    rm -rf $tmpPath
+}
+
+
+echo "**** 【高级搜索】开始安装 ****"
+getVersion
+if [ ! -d "$patchPath/$version" ]; then
+    echo "**** 高级搜索补丁目录不存在 ****"
+    downloadPatch
+fi
+if [[ "$ADV_SEARCH_LITE" == "true" ]]; then
+    patchVersion="精简版"
+fi
+patchFile=$(find "$patchPath/$version" -type f -name "*$patchVersion*" -print)
+if [ ! -z "$patchFile" ]; then
+    cp -f $patchFile $pathFile
+    echo "**** 【高级搜索${patchVersion}】安装成功 ****"
+else
+    echo "**** 没有找到【${patchVersion}】文件 ****"
+    if [ $patchVersion == "完全版" ]; then
+        patchVersion="精简版"
+        patchFile=$(find "$patchPath/$version" -type f -name "*$patchVersion*" -print)
+        if [ ! -z "$patchFile" ]; then
+            echo "**** 正在安装【${patchVersion}】 ****"
+            cp -f $patchFile $pathFile
+            echo "**** 【高级搜索${patchVersion}】安装成功 ****"
+        fi
+    fi
+fi
+
