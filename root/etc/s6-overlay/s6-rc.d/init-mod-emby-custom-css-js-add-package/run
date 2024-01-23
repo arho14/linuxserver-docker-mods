@@ -1,0 +1,46 @@
+#!/usr/bin/with-contenv bash
+
+# 设置临时文件夹路径
+temp_folder="/config/mods/emby_custom_css_js"
+
+# 设置目标目录路径
+plugins_folder="/config/plugins"
+modules_folder="/app/emby/dashboard-ui/modules"
+
+# 创建临时文件夹
+mkdir -p "$temp_folder"
+
+# 下载GitHub项目的tar文件
+curl -L -o "$temp_folder/emby_custom_css_js.tar.gz" https://mirror.ghproxy.com/https://github.com/Shurelol/Emby.CustomCssJS/archive/refs/heads/main.tar.gz
+
+# 检查下载是否成功
+if [ $? -eq 0 ]; then
+    echo "**** CustomCssJS下载成功 ****"
+    # 解压tar文件
+    tar -xzf "$temp_folder/emby_custom_css_js.tar.gz" -C "$temp_folder"
+    
+    # 复制文件到目标目录（覆盖同名文件）
+    cp -f "$temp_folder/Emby.CustomCssJS-main/src/Emby.CustomCssJS.dll" "$plugins_folder"
+    cp -f "$temp_folder/Emby.CustomCssJS-main/src/CustomCssJS.js" "$modules_folder"
+    # 设置文件权限
+    lsiown -R abc:abc $plugins_folder
+        
+    # 检查复制是否成功
+    if [ $? -eq 0 ]; then
+    
+        # 修改app.js文件
+        if grep -q "CustomCssJS" "/app/emby/dashboard-ui/app.js"; then
+            echo "app.js文件已包含指定内容，无需修改。"
+        else
+            sed -i 's/Promise.all(list.map(loadPlugin))/list.push(".\/modules\/CustomCssJS.js"),Promise.all(list.map(loadPlugin))/g' /app/emby/dashboard-ui/app.js
+        fi
+        echo "**** CustomCssJS安装成功 ****"
+
+        # 清理临时文件
+        rm -rf "$temp_folder"
+    else
+        echo "**** CustomCssJS安装失败，请检查目标目录是否存在或具有适当的权限。 ****"
+    fi
+else
+    echo "**** CustomCssJS下载失败，请检查网络连接或URL是否正确。 ****"
+fi
