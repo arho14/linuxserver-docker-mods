@@ -1,38 +1,51 @@
 #!/usr/bin/with-contenv bash
 
 # 设置临时文件夹路径
-temp_folder="/config/mods/emby_custom_css_js"
+tempPath="/config/mods/emby_custom_css_js"
 
 # 设置目标目录路径
-plugins_folder="/config/plugins"
-modules_folder="/app/emby/dashboard-ui/modules"
+pluginsPath="/config/plugins"
+uiPath="/app/emby/dashboard-ui"
+# 判断/app/emby/dashboard-ui目录是否存在
+if [ ! -d "/app/emby/dashboard-ui" ]; then
+    if [ -d "/app/emby/system/dashboard-ui" ]; then
+        uiPath="/app/emby/system/dashboard-ui"
+    else
+        echo "**** CustomCssJS安装失败 ****"
+        echo "**** 无法定位dashboard-ui ****"
+        exit
+    fi
+fi
+
+modulesPath="$uiPath/modules"
+appjsPath="$uiPath/app.js"
 
 # 创建临时文件夹
-mkdir -p "$temp_folder"
+mkdir -p "$tempPath"
 
 # 下载GitHub项目的tar文件
-curl -L -o "$temp_folder/emby_custom_css_js.tar.gz" https://mirror.ghproxy.com/https://github.com/Shurelol/Emby.CustomCssJS/archive/refs/heads/main.tar.gz
+curl -L -o "$tempPath/emby_custom_css_js.tar.gz" https://mirror.ghproxy.com/https://github.com/Shurelol/Emby.CustomCssJS/archive/refs/heads/main.tar.gz
 
 # 检查下载是否成功
 if [ $? -eq 0 ]; then
     echo "**** CustomCssJS下载成功 ****"
     # 解压tar文件
-    tar -xzf "$temp_folder/emby_custom_css_js.tar.gz" -C "$temp_folder"
+    tar -xzf "$tempPath/emby_custom_css_js.tar.gz" -C "$tempPath"
     
     # 复制文件到目标目录（覆盖同名文件）
-    cp -f "$temp_folder/Emby.CustomCssJS-main/src/Emby.CustomCssJS.dll" "$plugins_folder"
-    cp -f "$temp_folder/Emby.CustomCssJS-main/src/CustomCssJS.js" "$modules_folder"
+    cp -f "$tempPath/Emby.CustomCssJS-main/src/Emby.CustomCssJS.dll" "$pluginsPath"
+    cp -f "$tempPath/Emby.CustomCssJS-main/src/CustomCssJS.js" "$modulesPath"
     # 设置文件权限
-    lsiown -R abc:abc $plugins_folder
+    lsiown -R abc:abc $pluginsPath
         
     # 检查复制是否成功
     if [ $? -eq 0 ]; then
     
         # 修改app.js文件
-        if grep -q "CustomCssJS" "/app/emby/dashboard-ui/app.js"; then
+        if grep -q "CustomCssJS" "$appjsPath"; then
             echo "app.js文件已包含指定内容，无需修改。"
         else
-            sed -i 's/Promise.all(list.map(loadPlugin))/list.push(".\/modules\/CustomCssJS.js"),Promise.all(list.map(loadPlugin))/g' /app/emby/dashboard-ui/app.js
+            sed -i 's/Promise.all(list.map(loadPlugin))/list.push(".\/modules\/CustomCssJS.js"),Promise.all(list.map(loadPlugin))/g' $appjsPath
         fi
         echo "**** CustomCssJS安装成功 ****"
 
