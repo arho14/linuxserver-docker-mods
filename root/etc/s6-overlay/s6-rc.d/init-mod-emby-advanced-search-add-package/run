@@ -15,7 +15,7 @@ getVersion() {
     # 读取/app/emby/EmbyServer.deps.json内容并存入version变量中
     if [ -f "/app/emby/system/EmbyServer.deps.json" ]; then
         version=$(grep -m 1 -oP '(?<=Emby.Web": ")[^"]*' /app/emby/system/EmbyServer.deps.json)
-    elif [-f "/app/emby/EmbyServer.deps.json" ]; then
+    elif [ -f "/app/emby/EmbyServer.deps.json" ]; then
         version=$(grep -m 1 -oP '(?<=Emby.Web": ")[^"]*' /app/emby/EmbyServer.deps.json)
     else
         echo "**** 安装失败:无法获取emby版本 ****"
